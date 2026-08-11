@@ -7,20 +7,27 @@ public class MazeResultHolder : MonoBehaviour
 {
     public static MazeResultHolder Instance { get; private set; }
 
-    /// <summary>
-    /// 最終スコア
-    /// </summary>
+    // 最終スコア
     public int LastScore { get; private set; }
 
-    /// <summary>
-    /// クリアしたかどうか
-    /// </summary>
+    // クリアしたか
     public bool LastCleared { get; private set; }
 
-    /// <summary>
-    /// 最後に取得したアイテム数
-    /// </summary>
+    // 獲得アイテム数
     public int LastItemCount { get; private set; }
+
+    // アイテムによるスコア
+    public int LastItemScore { get; private set; }
+
+    // 残り時間によるスコア
+    public int LastTimeScore { get; private set; }
+
+    // クリアボーナス
+    public int LastClearBonus { get; private set; }
+
+    // クリア時の残り時間
+    public int LastRemainingTime { get; private set; }
+
 
     private void Awake()
     {
@@ -35,16 +42,28 @@ public class MazeResultHolder : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+
     /// <summary>
     /// ゲーム結果を保存する。
     /// </summary>
     public void SetResult(
         int score,
         bool cleared,
-        int itemCount)
+        int itemCount,
+        int itemScore,
+        int timeScore,
+        int clearBonus,
+        int remainingTime)
     {
         LastScore = score;
         LastCleared = cleared;
+
         LastItemCount = itemCount;
+
+        LastItemScore = itemScore;
+        LastTimeScore = timeScore;
+        LastClearBonus = clearBonus;
+
+        LastRemainingTime = remainingTime;
     }
 }

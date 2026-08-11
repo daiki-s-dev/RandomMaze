@@ -20,30 +20,18 @@ public class MazeGameManager : MonoBehaviour
     [Tooltip("クリア時、残り時間1秒あたりに加算されるスコア")]
     public int timeScoreMultiplier = 10;
 
+    [Tooltip("アイテム1個あたりの基本スコア")]
+    public int itemScoreMultiplier = 100;
+
     [Tooltip("ゴール到達時に加算される固定ボーナス")]
     public int clearBonus = 500;
 
-    /// <summary>
-    /// スコアが変更されたときに呼ばれる。
-    /// </summary>
     public Action<int> OnScoreChanged;
-
-    /// <summary>
-    /// アイテム取得数が変更されたときに呼ばれる。
-    /// </summary>
     public Action<int> OnItemCountChanged;
-
-    /// <summary>
-    /// ゴール到達でクリアしたときに呼ばれる。
-    /// </summary>
     public Action<int> OnGameClear;
-
-    /// <summary>
-    /// 制限時間切れでゲームオーバーになったときに呼ばれる。
-    /// </summary>
     public Action<int> OnGameOver;
 
-    // アイテムによる合計スコア
+    // 現在のアイテムスコア
     private int itemScore = 0;
 
     // 取得したアイテム数
@@ -96,36 +84,30 @@ public class MazeGameManager : MonoBehaviour
 
     private void StartGame()
     {
-        // ゲーム状態を初期化
         itemScore = 0;
         collectedItemCount = 0;
 
         isCleared = false;
         isGameOver = false;
 
-        // 迷路を生成
         mazeGenerator.Generate();
 
-        // 迷路生成後にカメラを調整
         if (mazeCamera != null)
         {
             mazeCamera.AdjustCamera();
         }
 
-        // プレイヤーをスタート地点へ移動
         if (player != null)
         {
             player.position = mazeGenerator.StartWorldPosition;
         }
 
-        // タイマー開始
         if (mazeTimer != null)
         {
             mazeTimer.OnTimeUp += HandleTimeUp;
             mazeTimer.StartTimer();
         }
 
-        // UIを初期状態にする
         OnScoreChanged?.Invoke(itemScore);
         OnItemCountChanged?.Invoke(collectedItemCount);
     }
@@ -135,21 +117,16 @@ public class MazeGameManager : MonoBehaviour
 
     #region アイテム取得
 
-    /// <summary>
-    /// アイテムを取得したときに呼ばれる。
-    /// </summary>
     public void OnItemCollected(int value)
     {
         if (isCleared || isGameOver)
             return;
 
-        // アイテム取得数を1増やす
         collectedItemCount++;
 
-        // アイテムのスコアを加算
-        itemScore += value;
+        // 今回はアイテム1個につきitemScoreMultiplier点
+        itemScore += itemScoreMultiplier;
 
-        // UIへ通知
         OnItemCountChanged?.Invoke(collectedItemCount);
         OnScoreChanged?.Invoke(itemScore);
     }
@@ -159,9 +136,6 @@ public class MazeGameManager : MonoBehaviour
 
     #region ゴール
 
-    /// <summary>
-    /// ゴールに到達したときに呼ばれる。
-    /// </summary>
     public void OnGoalReached()
     {
         if (isCleared || isGameOver)
@@ -169,16 +143,15 @@ public class MazeGameManager : MonoBehaviour
 
         isCleared = true;
 
-        // タイマー停止
         if (mazeTimer != null)
         {
             mazeTimer.StopTimer();
         }
 
-        // 最終スコアを計算
-        int finalScore = CalculateFinalScore(true);
+        // スコア内訳を計算
+        int timeScore = CalculateTimeScore();
+        int finalScore = CalculateFinalScore();
 
-        // クリア通知
         OnGameClear?.Invoke(finalScore);
 
         // 結果を保存
@@ -187,7 +160,13 @@ public class MazeGameManager : MonoBehaviour
             MazeResultHolder.Instance.SetResult(
                 finalScore,
                 true,
-                collectedItemCount
+                collectedItemCount,
+                itemScore,
+                timeScore,
+                clearBonus,
+                mazeTimer != null
+                    ? Mathf.RoundToInt(mazeTimer.RemainingTime)
+                    : 0
             );
         }
 
@@ -209,9 +188,6 @@ public class MazeGameManager : MonoBehaviour
 
     #region 制限時間切れ
 
-    /// <summary>
-    /// 制限時間が0になったときに呼ばれる。
-    /// </summary>
     private void HandleTimeUp()
     {
         if (isCleared || isGameOver)
@@ -219,19 +195,23 @@ public class MazeGameManager : MonoBehaviour
 
         isGameOver = true;
 
-        // 最終スコアを計算
-        int finalScore = CalculateFinalScore(false);
+        // 時間切れの場合は残り時間0
+        int timeScore = 0;
 
-        // ゲームオーバー通知
+        int finalScore = CalculateFinalScore();
+
         OnGameOver?.Invoke(finalScore);
 
-        // 結果を保存
         if (MazeResultHolder.Instance != null)
         {
             MazeResultHolder.Instance.SetResult(
                 finalScore,
                 false,
-                collectedItemCount
+                collectedItemCount,
+                itemScore,
+                timeScore,
+                0,
+                0
             );
         }
     }
@@ -242,24 +222,32 @@ public class MazeGameManager : MonoBehaviour
     #region スコア計算
 
     /// <summary>
+    /// 残り時間によるスコアを計算する。
+    /// </summary>
+    private int CalculateTimeScore()
+    {
+        if (mazeTimer == null)
+            return 0;
+
+        return Mathf.RoundToInt(
+            mazeTimer.RemainingTime
+        ) * timeScoreMultiplier;
+    }
+
+    /// <summary>
     /// 最終スコアを計算する。
     /// </summary>
-    private int CalculateFinalScore(bool cleared)
+    private int CalculateFinalScore()
     {
         int score = itemScore;
 
-        if (cleared)
-        {
-            // クリアボーナス
-            score += clearBonus;
+        // 残り時間スコア
+        score += CalculateTimeScore();
 
-            // 残り時間によるボーナス
-            if (mazeTimer != null)
-            {
-                score += Mathf.RoundToInt(
-                    mazeTimer.RemainingTime
-                ) * timeScoreMultiplier;
-            }
+        // クリアボーナス
+        if (isCleared)
+        {
+            score += clearBonus;
         }
 
         return score;
