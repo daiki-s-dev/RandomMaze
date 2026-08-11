@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 迷路内に配置される収集アイテム。
-/// プレイヤーが触れると MazeGameManager に取得を通知して消滅する。
+/// プレイヤーが触れるとスコアを加算し、SEを再生して消滅する。
 /// </summary>
 public class MazeItem : MonoBehaviour
 {
@@ -14,10 +14,16 @@ public class MazeItem : MonoBehaviour
         if (!other.CompareTag("Player"))
             return;
 
-        // アイテム取得をゲームマネージャーに通知
+        // スコア加算
         if (MazeGameManager.Instance != null)
         {
             MazeGameManager.Instance.OnItemCollected(scoreValue);
+        }
+
+        // アイテム取得SE
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayItemGet();
         }
 
         // アイテムを削除
